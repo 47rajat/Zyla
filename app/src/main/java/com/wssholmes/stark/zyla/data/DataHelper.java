@@ -35,6 +35,7 @@ public class DataHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase sqLiteDatabase, int i, int i1) {
 
+        //Droping existing table, this can be replaced by any suitable action.
         sqLiteDatabase.execSQL("DROP TABLE IF EXISTS "+ DataContract.SongEntry.TABLE_NAME);
 
     }

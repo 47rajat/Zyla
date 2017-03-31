@@ -1,15 +1,15 @@
 package com.wssholmes.stark.zyla;
 
-import android.app.LoaderManager;
 import android.content.ContentValues;
-import android.content.CursorLoader;
-import android.content.Loader;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 
 import com.wssholmes.stark.zyla.data.DataContract;
 
@@ -19,14 +19,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Vector;
 
-public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     private static final String LOG_TAG = MainActivity.class.getSimpleName();
 
-    private static final int CURSOR_LOADER_ID = 0;
+    //Fields for finding and inflating fragments by tag.
+    private static final String ALBUM_FRAGMENT_TAG = "ALBUM_FRAGMENT_TAG";
+    private static final String ARTIST_FRAGMENT_TAG = "ARTIST_FRAGMENT_TAG";
 
-    private static final String[] PROJECTION = new String[]{
-            DataContract.SongEntry.NAME
-    };
+    //Fields for updating page count on fragment change.
+    private int mPageCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,10 +43,27 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             sharedPreferences.edit().putBoolean(IS_FIRST_TIME,false).apply();
 
         }
-        getLoaderManager().initLoader(CURSOR_LOADER_ID, null ,this);
+
+        Spinner mCategorySpinner = (Spinner) findViewById(R.id.spinner_category);
+        Spinner mCountSpinner = (Spinner) findViewById(R.id.spinner_count);
+
+        ArrayAdapter<CharSequence> categoryAdapter = ArrayAdapter.createFromResource(this,
+                R.array.sort_category, android.R.layout.simple_spinner_dropdown_item);
+
+        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mCategorySpinner.setAdapter(categoryAdapter);
+        mCategorySpinner.setOnItemSelectedListener(this);
+
+        ArrayAdapter<CharSequence> countAdapter = ArrayAdapter.createFromResource(this,
+                R.array.page_size, android.R.layout.simple_spinner_dropdown_item);
+        countAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mCountSpinner.setAdapter(countAdapter);
+        mCountSpinner.setOnItemSelectedListener(this);
+
+
     }
 
-
+    //This method is used to update the database from the csv, upon first initialization.
     private void updateDatabase() {
 
         InputStream inStream;
@@ -94,25 +112,111 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
+
     @Override
-    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        return new CursorLoader(this,
-                DataContract.SongEntry.CONTENT_URI,
-                PROJECTION,
-                null,
-                null,
-                null);
+    public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long id) {
+
+        switch (adapterView.getId()){
+            case R.id.spinner_category:
+            {
+                switch (pos){
+                    case 0:
+                        //Album fragment selected.
+                        if (getFragmentManager().findFragmentByTag(ALBUM_FRAGMENT_TAG) == null){
+
+                            getFragmentManager().beginTransaction()
+                                    .replace(R.id.container, new AlbumFragment(), ALBUM_FRAGMENT_TAG)
+                                    .commit();
+
+                        }
+                        break;
+                    case 1:
+                        //Artist fragment selected.
+                        if (getFragmentManager().findFragmentByTag(ARTIST_FRAGMENT_TAG) == null) {
+
+                            getFragmentManager().beginTransaction()
+                                    .replace(R.id.container, new ArtistFragment(), ARTIST_FRAGMENT_TAG)
+                                    .commit();
+                        }
+                        break;
+                }
+
+                //This is important to execute pending transactions so that the fragments can be
+                //accessed properly using tags.
+                getFragmentManager().executePendingTransactions();
+
+                //Setting the current pagecount (if >1) for the new fragment.
+                if (getFragmentManager().findFragmentByTag(ALBUM_FRAGMENT_TAG) != null && mPageCount > 1){
+                    AlbumFragment albumFragment = (AlbumFragment)getFragmentManager()
+                            .findFragmentByTag(ALBUM_FRAGMENT_TAG);
+
+                    albumFragment.setLayoutSpan(mPageCount);
+                }
+                if (getFragmentManager().findFragmentByTag(ARTIST_FRAGMENT_TAG) != null && mPageCount > 1){
+                    ArtistFragment artistFragment = (ArtistFragment) getFragmentManager().
+                            findFragmentByTag(ARTIST_FRAGMENT_TAG);
+
+                    artistFragment.setLayoutSpan(mPageCount);
+                }
+                break;
+            }
+            case R.id.spinner_count:
+            {
+                int value = -1;
+                switch (pos) {
+                    case 0:
+                        value = 1;
+                        break;
+                    case 1:
+                        value = 2;
+                        break;
+                    case 2:
+                        value = 3;
+                        break;
+                    case 3:
+                        value = 4;
+                        break;
+                    case 4:
+                        value = 5;
+                        break;
+                    }
+
+                    if (value > 0){
+                        mPageCount = value;
+
+                        //This is important to execute pending transactions so that the fragments can be
+                        //accessed properly using tags.
+                        //This is here to ensure that you are not taking any chances.
+                        getFragmentManager().executePendingTransactions();
+
+                        if (getFragmentManager().findFragmentByTag(ALBUM_FRAGMENT_TAG) !=null){
+
+                            AlbumFragment albumFragment = (AlbumFragment)getFragmentManager()
+                                    .findFragmentByTag(ALBUM_FRAGMENT_TAG);
+
+                            albumFragment.setLayoutSpan(value);
+                        }
+                        if (getFragmentManager().findFragmentByTag(ARTIST_FRAGMENT_TAG) != null){
+
+                            ArtistFragment artistFragment = (ArtistFragment) getFragmentManager().
+                                    findFragmentByTag(ARTIST_FRAGMENT_TAG);
+
+                            artistFragment.setLayoutSpan(value);
+                        }
+
+                    }
+                break;
+            }
+            default:
+                Log.v(LOG_TAG, "unknown spinner selected");
+        }
+
     }
 
     @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+    public void onNothingSelected(AdapterView<?> adapterView) {
 
-        Log.v(LOG_TAG, "The number of songs loaded from csv " +  data.getCount());
 
-    }
-
-    @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
 
     }
 }

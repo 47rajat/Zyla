@@ -43,7 +43,6 @@ public class DataProvider extends ContentProvider {
         switch (sUrimatcher.match(uri)){
             case SONG:
             {
-                Log.v(LOG_TAG, "songs queried");
                 cursor = mDatabase.getReadableDatabase()
                         .query(DataContract.SongEntry.TABLE_NAME,
                                 projection,
